@@ -1,1 +1,1099 @@
-# Code
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_NAME_LEN 50
+#define MAX_EMAIL_LEN 100
+#define MAX_PASSWORD_LEN 100
+#define MAX_LOCATION_LEN 100
+#define MAX_DATE_LEN 11 
+#define MAX_TIME_LEN 6 
+#define MAX_CARD_NUM_LEN 20 
+
+// Structure for User
+struct User {
+    char name[MAX_NAME_LEN];
+    char email[MAX_EMAIL_LEN];
+    char password[MAX_PASSWORD_LEN];
+    int role;
+};
+
+// Structure for Flight
+struct Flight {
+    int flight_no;
+    char departure[MAX_LOCATION_LEN];
+    char destination[MAX_LOCATION_LEN];
+    char date[MAX_DATE_LEN];
+    char time[MAX_TIME_LEN];
+    int available_seats;
+    int booked_seats;
+    float economy_price;
+    float business_price;
+};
+
+// Structure for Booking
+struct Booking {
+    char user_email[50];
+    char passenger_name[MAX_NAME_LEN];
+    char card_number[MAX_CARD_NUM_LEN]; 
+    int flight_no;
+    char departure[MAX_LOCATION_LEN];
+    char destination[MAX_LOCATION_LEN];
+    char date[MAX_DATE_LEN];
+    char time[MAX_TIME_LEN];
+    int class_type;
+    int seats_booked;
+    int seat_count; 
+};
+
+// Linked List Node for Flight
+struct FlightNode {
+    struct Flight flight;
+    struct FlightNode *next;
+};
+
+// Linked List Node for Booking
+struct BookingNode {
+    struct Booking booking;
+    struct BookingNode *next;
+};
+
+// Linked List Node for User
+struct UserNode {
+    struct User user;
+    struct UserNode *next;
+};
+
+// Head pointers for linked lists
+struct FlightNode *flightHead = NULL;
+struct BookingNode *bookingHead = NULL;
+
+// Function prototypes
+void save_bookings_to_file();  
+void load_bookings_from_file();
+void clear_flight_list();
+void add_flight();
+void press_enter_to_continue();
+void print_main_menu();
+void print_user_menu();
+void print_admin_menu();
+void print_decorative_title();
+int is_duplicate(int flight_no);
+
+// Function to wait for the Enter key
+void press_enter_to_continue() {
+    printf("Press Enter to continue...");
+    while (getchar() != '\n');
+    getchar();
+}
+
+// Decorative title function
+void print_decorative_title() {
+    // Clear the screen
+    printf("\033[H\033[J");
+    // Print title
+    printf("\n\n");
+    printf("\t\t|~~~~~~~~~~~~~~~~~~~~~~~~~~~~|\n");
+    printf("\t\t|\tCHANGAW AIRLINES     |\n");
+    printf("\t\t|----------------------------|\n");
+    printf("\t\t|Welcome to Changaw Airlines!|\n");
+    printf("\t\t|~~~~~~~~~~~~~~~~~~~~~~~~~~~~|\n");
+}
+
+// Function to print the main menu
+void print_main_menu() {
+    printf("\n\t--------------------------------------------\n");
+    printf("\t|  1. Register Account    |  2. Login      |\n");
+    printf("\t--------------------------------------------\n");
+    printf("\t|                 3. Exit                  |\n");
+    printf("\t--------------------------------------------\n");
+    printf("Enter your choice: ");
+}
+
+// Function to print the user menu
+void print_user_menu() {
+    printf("\n\t--------------------------------------------\n");
+    printf("\t|  1. Book Flight       |  2. View Bookings |\n");
+    printf("\t--------------------------------------------\n");
+    printf("\t|  3. Logout            |  4. Exit          |\n");
+    printf("\t--------------------------------------------\n");
+    printf("Enter your choice: ");
+}
+
+// Function to print the admin menu
+void print_admin_menu() {
+    printf("\n\t--------------------------------------------\n");
+    printf("\t| 1. Add Flight         | 2. List Flights  |\n");
+    printf("\t--------------------------------------------\n");
+    printf("\t| 3. Delete Flight      | 4. Update Flight |\n");
+    printf("\t--------------------------------------------\n");
+    printf("\t| 5. Update Booking     | 6. Passenger List|\n");
+    printf("\t--------------------------------------------\n");
+    printf("\t| 7. Logout             | 8. Exit          |\n");
+    printf("\t--------------------------------------------\n");
+    printf("Enter your choice: ");
+}
+
+// Head pointer for linked list of users
+struct UserNode *userHead = NULL;
+
+//register a user
+void register_user() {
+    struct User newUser;
+    FILE *fp = fopen("users.txt", "a");
+    if (fp == NULL) {
+        perror("Error opening users file");
+        return;
+    }
+    printf("User Registration\n");
+    printf("------------------\n");
+    printf("Enter your name: ");
+    scanf(" %[^\n]%*c", newUser.name);
+    printf("Enter your email: ");
+    scanf(" %[^\n]%*c", newUser.email);
+    printf("Enter your password: ");
+    scanf(" %[^\n]%*c", newUser.password);
+    char confirmation;
+    printf("Are you registering as an admin? (y/n): ");
+    scanf(" %c", &confirmation);
+    if (confirmation == 'y' || confirmation == 'Y') {
+        newUser.role = 1; 
+        printf("You have registered as an admin.\n");
+    } else if (confirmation == 'n' || confirmation == 'N') {
+        newUser.role = 0;
+        printf("You have registered as a regular user.\n");
+    } else {
+        printf("Invalid input. Please enter 'y' for Yes or 'n' for No: ");
+        while (getchar() != '\n');
+        return;
+    }
+    fprintf(fp, "%s  %s   %s   %d\n", newUser.name, newUser.email, newUser.password, newUser.role);
+    printf("Registration successful!\n");
+    fclose(fp);
+}
+
+// Function to reset password
+void reset_password() {
+    char email[MAX_EMAIL_LEN];
+    char newPassword[MAX_PASSWORD_LEN];
+    int found = 0;
+    printf("Reset Password\n");
+    printf("----------------\n");
+    printf("Enter your email: ");
+    scanf(" %[^\n]%*c", email);
+
+    // Temporary storage for users
+    struct User user;
+    // text read mode
+    FILE *fp = fopen("users.txt", "r"); 
+    // Temporary file for updates
+    FILE *temp_fp = fopen("temp_users.txt", "w"); 
+    if (fp == NULL || temp_fp == NULL) {
+        perror("Error opening users file");
+        if (fp) fclose(fp);
+        return;
+    }
+    // Read users from the file and check for the matching email
+    while (fscanf(fp, "%s %s %s %d", user.name, user.email, user.password, &user.role) == 4) {
+        if (strcmp(user.email, email) == 0) {
+            printf("Enter new password: ");
+            scanf(" %[^\n]%*c", newPassword);
+            strcpy(user.password, newPassword);
+            found = 1;
+        }
+        fprintf(temp_fp, "%s %s %s %d\n", user.name, user.email, user.password, user.role);
+    }
+
+    fclose(fp);
+    fclose(temp_fp);
+    // Replace old file with updated file
+    remove("users.txt");
+    rename("temp_users.txt", "users.txt");
+    if (found) {
+        printf("Password reset successful!\n");
+    } else {
+        printf("Email not found.\n");
+    }
+}
+
+//login a user
+int login_user(struct User *loggedInUser) {
+    char email[MAX_EMAIL_LEN];
+    char password[MAX_PASSWORD_LEN];
+    int attempt = 0;
+    //text read mode
+    FILE *fp = fopen("users.txt", "r"); 
+    if (fp == NULL) {
+        perror("Error opening users file");
+        return 0;
+    }
+    struct User user;
+    while (attempt < 3) {
+        printf("User Login (Attempt %d of 3)\n", attempt + 1);
+        printf("------------------\n");
+        printf("Enter your email: ");
+        scanf(" %[^\n]%*c", email);
+        printf("Enter your password: ");
+        scanf(" %[^\n]%*c", password);
+        // Read users from the file
+        while (fscanf(fp, "%s %s %s %d", user.name, user.email, user.password, &user.role) == 4) {
+            if (strcmp(user.email, email) == 0 && strcmp(user.password, password) == 0) {
+                printf("Login successful! Welcome, %s!\n", user.name);
+                *loggedInUser = user;
+                fclose(fp);
+                return 1;
+            }
+        }
+        // Reset file pointer to the beginning for the next attempt
+        fseek(fp, 0, SEEK_SET); 
+        attempt++;
+        printf("Invalid email or password. Please try again.\n");
+    }
+    printf("Login failed after 3 attempts.\n");
+    fclose(fp);
+    return 0;
+}
+
+//handle failed login
+void handle_failed_login() {
+    int choice;
+    while (1) {
+        printf("\nOptions:\n");
+        printf("1. Register a new account\n");
+        printf("2. Try logging in again\n");
+        printf("3. Reset your password\n");
+        printf("Enter your choice: ");
+        // Read user choice with input validation
+        if (scanf("%d", &choice) != 1) {
+            printf("Invalid input. Please enter a number.\n");
+            while (getchar() != '\n');
+            continue;
+        }
+        switch (choice) {
+            case 1:
+                register_user();
+                return;
+            case 2:
+                return;
+            case 3:
+                reset_password();
+                return;
+            default:
+                printf("Invalid choice. Please try again.\n");
+        }
+    }
+}
+
+//Add a new flight (Admin)
+void add_flight() {
+    struct Flight flight;
+     //append mode
+    FILE *fp = fopen("flights.txt", "a");
+    if (fp == NULL) {
+        printf("Error opening flights file.\n");
+        return;
+    }
+    printf("Add a New Flight\n");
+    printf("----------------\n");
+    //flight details
+    printf("Enter flight number: ");
+    while (scanf("%d", &flight.flight_no) != 1) {
+        printf("Invalid input. Please enter a valid flight number: ");
+        while (getchar() != '\n');
+    }
+    if (is_duplicate(flight.flight_no)) {
+        printf("Duplicate flight number. Please enter a unique flight number.\n");
+        fclose(fp);
+        return;
+    }
+    printf("Enter departure location: ");
+    scanf(" %[^\n]%*c", flight.departure);
+    printf("Enter destination: ");
+    scanf(" %[^\n]%*c", flight.destination);
+    printf("Enter date (YYYY-MM-DD): ");
+    scanf(" %[^\n]%*c", flight.date);
+    printf("Enter time (HH:MM): ");
+    scanf(" %[^\n]%*c", flight.time);
+    printf("Enter available seats: ");
+    while (scanf("%d", &flight.available_seats) != 1 || flight.available_seats < 0) {
+        printf("Invalid input. Please enter a valid number of available seats: ");
+        while (getchar() != '\n');
+    }
+    printf("Enter booked seats (default 0): ");
+    while (scanf("%d", &flight.booked_seats) != 1 || flight.booked_seats < 0) {
+        printf("Invalid input. Please enter a valid number of booked seats: ");
+        while (getchar() != '\n');
+    }
+    printf("Enter Economy class price: ");
+    while (scanf("%f", &flight.economy_price) != 1 || flight.economy_price < 0) {
+        printf("Invalid input. Please enter a valid economy class price: ");
+        while (getchar() != '\n');
+    }
+    printf("Enter Business class price: ");
+    while (scanf("%f", &flight.business_price) != 1 || flight.business_price < 0) {
+        printf("Invalid input. Please enter a valid business class price: ");
+        while (getchar() != '\n');
+    }
+    // Append the flight to the file
+    fprintf(fp, "%d,%s,%s,%s,%s,%d,%d,%.2f,%.2f\n", 
+            flight.flight_no, flight.departure, 
+            flight.destination, flight.date, 
+            flight.time, flight.available_seats, flight.booked_seats, 
+            flight.economy_price, flight.business_price);
+    printf("Flight added successfully!\n");
+    fclose(fp);
+    //add the new flight to the linked list
+    struct FlightNode *newNode = (struct FlightNode *)malloc(sizeof(struct FlightNode));
+    if (newNode) {
+        newNode->flight = flight;
+        newNode->next = flightHead;
+        flightHead = newNode;
+    } else {
+        printf("Memory allocation for flight node failed.\n");
+    }
+}
+
+//list all available flights
+void list_available_flights() {
+    struct Flight flight;
+    // Clear the existing linked list
+    while (flightHead != NULL) {
+        struct FlightNode *temp = flightHead;
+        flightHead = flightHead->next;
+        free(temp);
+    }
+    //read mode
+    FILE *fp = fopen("flights.txt", "r"); 
+    if (fp == NULL) {
+        printf("Error opening flights file.\n");
+        return;
+    }
+
+    // Read flights from the file
+   while (fscanf(fp, "%d,%[^,],%[^,],%[^,],%[^,],%d,%d,%f,%f\n", 
+                  &flight.flight_no, flight.departure, 
+                  flight.destination, flight.date, 
+                  flight.time, &flight.available_seats, &flight.booked_seats, 
+                  &flight.economy_price, &flight.business_price) == 9) {
+        
+        // Allocate new node for each flight
+        struct FlightNode *newNode = (struct FlightNode *)malloc(sizeof(struct FlightNode));
+        if (newNode) {
+            newNode->flight = flight;
+            newNode->next = flightHead;
+            flightHead = newNode;
+        } else {
+            printf("Memory allocation for flight node failed.\n");
+            fclose(fp);
+            return;
+        }
+    }
+    fclose(fp);
+
+    struct FlightNode *current = flightHead;
+    int flight_counter = 1;
+
+    printf("All Available Flights\n");
+    printf("---------------------\n");
+    printf("| No | Flight No | From        | To          | Date         | Time   | Economy Price | Business Price | Seats | Booked |\n");
+    printf("------------------------------------------------------------------------------------------------------------------------\n");
+    int found = 0;
+
+    while (current != NULL) {
+        if (current->flight.available_seats > 0) {
+            printf("| %-2d | %-9d | %-11s | %-11s | %-12s | %-6s | T= %-10.2f | T= %-11.2f | %-5d | %-6d |\n",
+                   flight_counter++, current->flight.flight_no, 
+                   current->flight.departure, current->flight.destination, 
+                   current->flight.date, current->flight.time,
+                   current->flight.economy_price, current->flight.business_price, 
+                   current->flight.available_seats, current->flight.booked_seats);
+            found = 1;
+        }
+        current = current->next;
+    }
+    printf("------------------------------------------------------------------------------------------------------------------------\n");
+
+    if (!found) {
+        printf("No available flights found.\n");
+    }
+}
+
+
+//save the updated flight list back to the file
+void save_flights_to_file() {
+    //text write mode
+    FILE *fp = fopen("flights.txt", "w"); 
+    if (fp == NULL) {
+        printf("Error opening flights file for writing.\n");
+        return;
+    }
+    struct FlightNode *current = flightHead;
+    while (current != NULL) {
+        fprintf(fp, "%d,%s,%s,%s,%s,%d,%d,%.2f,%.2f\n", 
+                current->flight.flight_no, current->flight.departure, 
+                current->flight.destination, current->flight.date, 
+                current->flight.time, current->flight.available_seats, current->flight.booked_seats, 
+                current->flight.economy_price, current->flight.business_price);
+        current = current->next;
+    }
+    fclose(fp);
+}
+
+//check for duplicates
+int is_duplicate(int flight_no) {
+    struct FlightNode *current = flightHead;
+    while (current != NULL) {
+        if (current->flight.flight_no == flight_no) {
+            return 1;
+        }
+        current = current->next;
+    }
+    return 0;
+}
+
+//list all passenger
+void list_passengers() {
+    struct BookingNode *current = bookingHead;
+    int passenger_counter = 1;
+
+    printf("Passenger List\n");
+    printf("---------------\n");
+    printf("| No | Passenger Name       | Email                     | Flight No | Business Seats | Economy Seats |\n");
+    printf("------------------------------------------------------------------------------------------------------\n");
+    while (current != NULL) {
+        int business_seats = 0;
+        int economy_seats = 0;
+        struct BookingNode *temp = bookingHead;
+        while (temp != NULL) {
+            if (strcmp(temp->booking.user_email, current->booking.user_email) == 0 &&
+                strcmp(temp->booking.passenger_name, current->booking.passenger_name) == 0 &&
+                temp->booking.flight_no == current->booking.flight_no) {
+                if (temp->booking.class_type == 1) {
+                    economy_seats++;
+                } else if (temp->booking.class_type == 2) {
+                    business_seats++;
+                }
+            }
+            temp = temp->next;
+        }
+        // display the passenger's details and seat counts
+        printf("| %-2d | %-20s | %-25s | %-9d | %-14d | %-13d |\n",
+               passenger_counter++,
+               current->booking.passenger_name,
+               current->booking.user_email,
+               current->booking.flight_no,
+               business_seats,
+               economy_seats);
+        // Skip to the next unique passenger (name and email) and flight combination
+        struct BookingNode *skip = current;
+        while (current != NULL &&
+               strcmp(current->booking.user_email, skip->booking.user_email) == 0 &&
+               strcmp(current->booking.passenger_name, skip->booking.passenger_name) == 0 &&
+               current->booking.flight_no == skip->booking.flight_no) {
+            current = current->next;
+        }
+    }
+    printf("------------------------------------------------------------------------------------------------------\n");
+}
+
+//delete a flight
+void delete_flight(int flight_no) {
+    struct FlightNode *current = flightHead;
+    struct FlightNode *previous = NULL;
+    // Search for the flight
+    while (current != NULL && current->flight.flight_no != flight_no) {
+        previous = current;
+        current = current->next;
+    }
+    if (current == NULL) {
+        printf("Flight with number %d not found.\n", flight_no);
+        return;
+    }
+    // If the flight to delete is the head of the list
+    if (previous == NULL) {
+        flightHead = current->next;
+    } else {
+        previous->next = current->next;
+    }
+    free(current);
+    printf("Flight with number %d has been deleted successfully.\n", flight_no);
+    save_flights_to_file();
+}
+
+//update flight details
+void update_flight() {
+    int flight_no, found = 0;
+    printf("Enter flight number to update: ");
+    scanf("%d", &flight_no);
+
+    struct FlightNode *current = flightHead;
+    while (current != NULL) {
+        if (current->flight.flight_no == flight_no) {
+            found = 1;
+            printf("Updating details for Flight No: %d\n", flight_no);
+            printf("Enter new departure location (current: %s): ", current->flight.departure);
+            scanf("%s", current->flight.departure);
+            printf("Enter new destination (current: %s): ", current->flight.destination);
+            scanf("%s", current->flight.destination);
+            printf("Enter new date (current: %s): ", current->flight.date);
+            scanf("%s", current->flight.date);
+            printf("Enter new time (current: %s): ", current->flight.time);
+            scanf("%s", current->flight.time);
+            printf("Enter new available seats (current: %d): ", current->flight.available_seats);
+            scanf("%d", &current->flight.available_seats);
+            printf("Enter new economy class price (current: %.2f): ", current->flight.economy_price);
+            scanf("%f", &current->flight.economy_price);
+            printf("Enter new business class price (current: %.2f): ", current->flight.business_price);
+            scanf("%f", &current->flight.business_price);
+            printf("Flight updated successfully!\n");
+            save_flights_to_file();
+            break;
+        }
+        current = current->next;
+    }
+    if (!found) {
+        printf("Flight not found.\n");
+    }
+}
+
+//update booking details
+void update_booking() {
+    char user_email[50];
+    int flight_no, found = 0;
+    printf("Enter user email to update booking: ");
+    scanf("%s", user_email);
+    printf("Enter flight number to update booking: ");
+    scanf("%d", &flight_no);
+
+    struct BookingNode *current = bookingHead;
+    while (current != NULL) {
+        if (strcmp(current->booking.user_email, user_email) == 0 && current->booking.flight_no == flight_no) {
+            found = 1;
+            struct FlightNode *flightNode = flightHead;
+            while (flightNode != NULL) {
+                if (flightNode->flight.flight_no == flight_no) {
+                    break;
+                }
+                flightNode = flightNode->next;
+            }
+
+            if (flightNode == NULL) {
+                printf("Flight details not found for Flight No: %d.\n", flight_no);
+                return;
+            }
+
+            //new class
+            int new_class;
+            printf("Enter new class (1 for Economy, 2 for Business) (current: %d): ", current->booking.class_type);
+            while (scanf("%d", &new_class) != 1 || (new_class != 1 && new_class != 2)) {
+                printf("Invalid input. Please enter 1 for Economy or 2 for Business: ");
+                while (getchar() != '\n');
+            }
+
+            // Calculate total price difference
+            float price_difference_per_seat = 0.0;
+            int seat_count = 1;
+            if (current->booking.class_type == 1 && new_class == 2) {
+                price_difference_per_seat = flightNode->flight.business_price - flightNode->flight.economy_price;
+            } else if (current->booking.class_type == 2 && new_class == 1) {
+                price_difference_per_seat = flightNode->flight.economy_price - flightNode->flight.business_price;
+            }
+
+            // Update booking details
+            current->booking.class_type = new_class;
+            printf("Booking updated successfully! ");
+            if (price_difference_per_seat > 0) {
+                printf("Additional cost for upgrading %d seat(s): %.2f\n", seat_count, price_difference_per_seat * seat_count);
+                printf("Sending payment notification to %s. Please confirm the payment.\n", current->booking.user_email);
+            } else if (price_difference_per_seat < 0) {
+                printf("Refund amount for downgrading %d seat(s): %.2f\n", seat_count, -price_difference_per_seat * seat_count);
+                printf("Refund of %.2f will be processed to bank account: %s.\n", -price_difference_per_seat * seat_count, current->booking.card_number);
+            } else {
+                printf("No price difference for this change.\n");
+            }
+            save_bookings_to_file();
+        }
+        current = current->next;
+    }
+    if (!found) {
+        printf("Booking not found for user %s on flight %d.\n", user_email, flight_no);
+    }
+}
+
+//search for flights
+int search_flights(char departure[], char destination[], char date[]) {
+    struct FlightNode *current = flightHead;
+    int flight_found = 0;
+    int flight_counter = 1;
+
+    printf("All Available Flights\n");
+    printf("---------------------\n");
+    printf("| No | Flight No | From        | To          | Date         | Time   | Economy Price | Business Price | Seats | Booked |\n");
+    printf("------------------------------------------------------------------------------------------------------------------------\n");
+    while (current != NULL) {
+        // Use case-insensitive comparison for better matching
+        if (strcasecmp(current->flight.departure, departure) == 0 &&
+            strcasecmp(current->flight.destination, destination) == 0 &&
+            strcmp(current->flight.date, date) == 0) {
+            
+            flight_found = 1;
+            printf("| %-2d | %-9d | %-11s | %-11s | %-12s | %-6s | T= %-10.2f | T= %-11.2f | %-5d | %-6d |\n",
+                   flight_counter++, current->flight.flight_no, 
+                   current->flight.departure, current->flight.destination, 
+                   current->flight.date, current->flight.time,
+                   current->flight.economy_price, current->flight.business_price, 
+                   current->flight.available_seats, current->flight.booked_seats);
+        }
+        current = current->next;
+    }
+    printf("------------------------------------------------------------------------------------------------------------------------\n");
+    if (!flight_found) {
+        printf("No flights found matching your criteria.\n");
+    }
+    
+    return flight_found;
+}
+
+//print the billing receipt
+void print_billing_receipt(char *passenger_name, struct Flight selected_flight,int class_type, float price) {
+    printf("\n=========================== Billing Details ===========================\n");
+    printf("| %-15s: %-50s |\n", "Passenger Name", passenger_name);
+    printf("| %-15s: %-50d |\n", "Flight No", selected_flight.flight_no);
+    printf("| %-15s: %-50s |\n", "From", selected_flight.departure);
+    printf("| %-15s: %-50s |\n", "To", selected_flight.destination);
+    printf("| %-15s: %-50s |\n", "Date", selected_flight.date);
+    printf("| %-15s: %-50s |\n", "Time", selected_flight.time);
+    printf("| %-15s: %-50s |\n", "Class", class_type == 1 ? "Economy" : "Business");
+    printf("| %-15s: %-50.2f |\n", "Ticket Price", price);
+    printf("| %-15s: %-50s |\n", "Arrival Note", "Arrive at airport 1 hour before departure");
+    printf("=======================================================================\n\n");
+}
+
+//process payment
+int process_payment(float amount, const char *card_number) {
+    printf("Processing payment of %.2f Taka from card %s\n", amount, card_number);
+    return 1;//1 for success,0 for fail.
+}
+
+//send notification
+void send_notification(const char *email, const char *message) {
+    printf("Sending notification to %s: %s\n", email, message);
+}
+
+//load flights from file
+void load_flights_from_file() {
+    struct Flight flight;
+    clear_flight_list();
+    //text read mode
+    FILE *fp = fopen("flights.txt", "r"); 
+    if (fp == NULL) {
+        printf("No previous flights found.\n");
+        return;
+    }
+    while (fscanf(fp, "%d,%[^,],%[^,],%[^,],%[^,],%d,%d,%f,%f\n", 
+                  &flight.flight_no, flight.departure, 
+                  flight.destination, flight.date, 
+                  flight.time, &flight.available_seats, &flight.booked_seats, 
+                  &flight.economy_price, &flight.business_price) == 9) {
+        
+        //new node for each flight
+        struct FlightNode *newNode = (struct FlightNode *)malloc(sizeof(struct FlightNode));
+        if (newNode) {
+            newNode->flight = flight;
+            newNode->next = flightHead;
+            flightHead = newNode;
+        } else {
+            printf("Memory allocation for flight node failed.\n");
+            fclose(fp);
+            return;
+        }
+    }
+    fclose(fp);
+}
+
+//clear the flight list
+void clear_flight_list() {
+    struct FlightNode *current = flightHead;
+    while (current != NULL) {
+        struct FlightNode *temp = current;
+        current = current->next;
+        free(temp);
+    }
+    flightHead = NULL;
+}
+
+//book a flight
+void book_flight(struct User *user) {
+    char departure[MAX_LOCATION_LEN];
+    char destination[MAX_LOCATION_LEN];
+    char date[MAX_DATE_LEN];
+
+    printf("Enter departure location: ");
+    scanf("%s", departure);
+    printf("Enter destination location: ");
+    scanf("%s", destination);
+    printf("Enter date (YYYY-MM-DD): ");
+    scanf("%s", date);
+    if (!search_flights(departure, destination, date)) {
+        printf("No available flights found matching your criteria.\n");
+        return;
+    }
+
+    int flight_number;
+    printf("Enter the flight number you want to book: ");
+    scanf("%d", &flight_number);
+    struct FlightNode *current = flightHead;
+    struct Flight selected_flight;
+    int flight_found = 0;
+
+    while (current != NULL) {
+        if (current->flight.flight_no == flight_number) {
+            selected_flight = current->flight;
+            flight_found = 1;
+            break;
+        }
+        current = current->next;
+    }
+    if (!flight_found) {
+        printf("Flight number %d not found.\n", flight_number);
+        return;
+    }
+    if (selected_flight.available_seats <= 0) {
+        printf("No available seats on flight number %d.\n", flight_number);
+        return;
+    }
+    char user_email[MAX_EMAIL_LEN];
+    char passenger_name[MAX_NAME_LEN];
+    int class_type;
+    float price;
+    int seat_count;
+
+    printf("Enter your email: ");
+    scanf("%s", user_email);
+    printf("Enter passenger name: ");
+    scanf(" %[^\n]%*c", passenger_name);
+    printf("Select class type (1 for Economy, 2 for Business): ");
+    while (scanf("%d", &class_type) != 1 || (class_type != 1 && class_type != 2)) {
+        printf("Invalid input. Please enter 1 for Economy or 2 for Business: ");
+        while (getchar() != '\n');
+    }
+    printf("Enter the number of seats you want to book: ");
+    while (scanf("%d", &seat_count) != 1 || seat_count <= 0 || seat_count > selected_flight.available_seats) {
+        printf("Invalid input. Please enter a valid number of seats (max %d): ", selected_flight.available_seats);
+        while (getchar() != '\n');
+    }
+
+    price = (class_type == 1) ? selected_flight.economy_price * seat_count : selected_flight.business_price * seat_count;
+
+    char card_number[MAX_CARD_NUM_LEN];
+    printf("Enter your card number: ");
+    scanf("%s", card_number);
+
+    char confirmation;
+    printf("Are you sure you want to proceed with the payment of taka %.2f? (y/n): ", price);
+    scanf(" %c", &confirmation);
+    if (confirmation != 'y' && confirmation != 'Y') {
+        printf("Booking process canceled.\n");
+        return;
+    }
+
+    if (process_payment(price, card_number)) {
+    for (int i = 0; i < seat_count; i++) {
+        struct BookingNode *newNode = (struct BookingNode *)malloc(sizeof(struct BookingNode));
+        if (newNode == NULL) {
+            printf("Memory allocation for booking node failed.\n");
+            return;
+        }
+        strcpy(newNode->booking.user_email, user_email);
+        strcpy(newNode->booking.passenger_name, passenger_name);
+        strcpy(newNode->booking.card_number, card_number);
+        newNode->booking.flight_no = selected_flight.flight_no;
+        strcpy(newNode->booking.departure, selected_flight.departure);
+        strcpy(newNode->booking.destination, selected_flight.destination);
+        strcpy(newNode->booking.date, selected_flight.date);
+        strcpy(newNode->booking.time, selected_flight.time);
+        newNode->booking.class_type = class_type;
+
+        newNode->next = bookingHead;
+        bookingHead = newNode;
+        selected_flight.available_seats--;
+        current->flight.booked_seats++;
+    }
+    printf("%d seats booked successfully!\n", seat_count);
+    print_billing_receipt(passenger_name, selected_flight, class_type, price);
+    send_notification(user_email, "Your flight has been booked successfully!");
+    save_flights_to_file();
+    save_bookings_to_file();
+}else {
+        printf("Payment failed. Please try again.\n");
+    }
+}
+
+//save bookings to file
+void save_bookings_to_file() {
+    //text write mode
+    FILE *fp = fopen("bookings.txt", "w");
+    if (fp == NULL) {
+        printf("Error opening bookings file for writing.\n");
+        return;
+    }
+    struct BookingNode *current = bookingHead;
+    while (current != NULL) {
+        fprintf(fp, "%s,%s,%s,%d,%s,%s,%s,%s,%d\n", 
+                current->booking.user_email,
+                current->booking.passenger_name,
+                current->booking.card_number,
+                current->booking.flight_no,
+                current->booking.departure,
+                current->booking.destination,
+                current->booking.date,
+                current->booking.time,
+                current->booking.class_type);
+        current = current->next;
+    }
+
+    fclose(fp);
+}
+
+//clear bookings list
+void clear_booking_list() {
+    struct BookingNode *current = bookingHead;
+    while (current != NULL) {
+        struct BookingNode *temp = current;
+        current = current->next;
+        free(temp);
+    }
+    bookingHead = NULL;
+}
+
+//load bookings from file
+void load_bookings_from_file() {
+    clear_booking_list();
+    //text read mode
+    FILE *fp = fopen("bookings.txt", "r"); 
+    if (fp == NULL) {
+        printf("No previous bookings found.\n");
+        return;
+    }
+    struct Booking booking;
+    while (fscanf(fp, "%49[^,],%49[^,],%49[^,],%d,%49[^,],%49[^,],%10[^,],%5[^,],%d\n", 
+                  booking.user_email,
+                  booking.passenger_name,
+                  booking.card_number,
+                  &booking.flight_no,
+                  booking.departure,
+                  booking.destination,
+                  booking.date,
+                  booking.time,
+                  &booking.class_type) == 9) {
+        struct BookingNode *newNode = (struct BookingNode *)malloc(sizeof(struct BookingNode));
+        if (newNode == NULL) {
+            printf("Memory allocation for booking node failed.\n");
+            fclose(fp);
+            return;
+        }
+
+        newNode->booking = booking; 
+        newNode->next = bookingHead; 
+        bookingHead = newNode;
+    }
+
+    fclose(fp);
+}
+
+//view user's bookings
+void view_bookings(const struct User *user) {
+    struct BookingNode *current = bookingHead;
+    struct BookingDisplay {
+        char passenger_name[50];
+        int flight_no;
+        char departure[50];
+        char destination[50];
+        char date[11];
+        char time[6];
+        int business_seats;
+        int economy_seats;
+    } *bookings = NULL;
+
+    int booking_count = 0;
+    struct BookingNode *temp = bookingHead;
+    while (temp != NULL) {
+        if (strcmp(temp->booking.user_email, user->email) == 0) {
+            booking_count++;
+        }
+        temp = temp->next;
+    }
+    if (booking_count == 0) {
+        printf("No bookings found for your account.\n");
+        return;
+    }
+    // Allocate memory for bookings
+    bookings = (struct BookingDisplay *)calloc(booking_count, sizeof(struct BookingDisplay));
+    current = bookingHead;
+    int index = 0;
+    while (current != NULL) {
+        if (strcmp(current->booking.user_email, user->email) == 0) {
+            int found = 0;
+            for (int i = 0; i < index; i++) {
+                if (bookings[i].flight_no == current->booking.flight_no &&
+                    strcmp(bookings[i].passenger_name, current->booking.passenger_name) == 0) {
+                    if (current->booking.class_type == 1) {
+                        bookings[i].economy_seats++;
+                    } else if (current->booking.class_type == 2) {
+                        bookings[i].business_seats++;
+                    }
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) {
+                strcpy(bookings[index].passenger_name, current->booking.passenger_name);
+                bookings[index].flight_no = current->booking.flight_no;
+                strcpy(bookings[index].departure, current->booking.departure);
+                strcpy(bookings[index].destination, current->booking.destination);
+                strcpy(bookings[index].date, current->booking.date);
+                strcpy(bookings[index].time, current->booking.time);
+                if (current->booking.class_type == 1) {
+                    bookings[index].economy_seats = 1;
+                    bookings[index].business_seats = 0;
+                } else if (current->booking.class_type == 2) {
+                    bookings[index].economy_seats = 0;
+                    bookings[index].business_seats = 1;
+                }
+                index++;
+            }
+        }
+        current = current->next;
+    }
+    // Display bookings
+    printf("Your Bookings\n");
+    printf("-------------\n");
+    printf("| No | Passenger Name       | Flight No | From        | To          | Date       | Time  | Business | Economy |\n");
+    printf("---------------------------------------------------------------------------------------------------------------\n");
+
+    for (int i = 0; i < index; i++) {
+        printf("| %-2d | %-20s | %-9d | %-11s | %-11s | %-10s | %-5s | %-8d | %-7d |\n",
+               i + 1,
+               bookings[i].passenger_name,
+               bookings[i].flight_no,
+               bookings[i].departure,
+               bookings[i].destination,
+               bookings[i].date,
+               bookings[i].time,
+               bookings[i].business_seats,
+               bookings[i].economy_seats);
+    }
+    printf("---------------------------------------------------------------------------------------------------------------\n");
+    free(bookings);
+}
+
+
+
+// Main function
+int main() {
+    struct User loggedInUser ;
+    int choice, loggedIn = 0;
+    int flight_no;
+
+    load_bookings_from_file();
+    load_flights_from_file();
+
+    while (1) {
+        print_decorative_title();
+
+        if (!loggedIn) {
+            print_main_menu();
+
+            scanf("%d", &choice);
+            getchar();
+
+            switch (choice) {
+                case 1:
+                    register_user();
+                    press_enter_to_continue();
+                    break;
+                case 2:
+                    if (login_user(&loggedInUser )) {
+                        printf("\nWelcome to the system, %s!\n", loggedInUser .name);
+                        loggedIn = 1;
+                    } else {
+                        handle_failed_login();
+                    }
+                    press_enter_to_continue();
+                    break;
+                case 3:
+                    printf("Exiting the program. Goodbye!\n");
+                    return 0;
+                default:
+                    printf("Invalid choice. Please try again.\n");
+                    press_enter_to_continue();
+            }
+        } else {
+            // Admin menu
+            if (loggedInUser .role == 1) { 
+                print_admin_menu();
+                scanf("%d", &choice);
+                getchar();
+
+                switch (choice) {
+                    case 1:
+                        add_flight();
+                        break;
+                    case 2:
+                        list_available_flights();
+                        break;
+                    case 3:
+                        printf("Enter the flight number to delete: ");
+                        scanf("%d", &flight_no);
+                        delete_flight(flight_no);
+                        break;
+                    case 4:
+                        update_flight();
+                        break;
+                    case 5:
+                        update_booking();
+                        break;
+                    case 6:
+                        list_passengers();
+                        break;
+                    case 7:
+                        loggedIn = 0;
+                        printf("\nLogged out successfully.\n");
+                        break;
+                    case 8:
+                        printf("Exiting the program. Goodbye!\n");
+                        return 0;
+                    default:
+                        printf("Invalid choice. Please try again.\n");
+                }
+                press_enter_to_continue();
+            } else { 
+                // User menu
+                print_user_menu();
+                scanf("%d", &choice);
+                getchar();
+
+                switch (choice) {
+                    case 1:
+                        book_flight(&loggedInUser );
+                        break;
+                    case 2:
+                        view_bookings(&loggedInUser );
+                        break;
+                    case 3:
+                        loggedIn = 0;
+                        printf("\nLogged out successfully.\n");
+                        break;
+                    case 4:
+                        printf("Exiting the program. Goodbye!\n");
+                        return 0;
+                    default:
+                        printf("Invalid choice. Please try again.\n");
+                }
+                press_enter_to_continue();
+            }
+        }
+    }
+
+    return 0;
+}
