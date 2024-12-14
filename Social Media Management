@@ -1,0 +1,457 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+// Define the structure for a user account
+typedef struct User {
+    char username[100];
+    char password[100];
+    struct User* next;  // Pointer to the next user in the linked list
+} User;
+
+// Define the structure for a post (Doubly Linked List)
+typedef struct Post {
+    char title[100];
+    char content[500];
+    time_t timestamp;
+    struct Post* next;
+    struct Post* prev;  // Added prev pointer for doubly linked list
+} Post;
+
+// Define the structure for a friend in the BST
+typedef struct Friend {
+    char name[100];
+    struct Friend* left;
+    struct Friend* right;
+} Friend;
+
+// Define the structure for a friend request in the stack
+typedef struct FriendRequest {
+    char requester[100];
+    struct FriendRequest* next;
+} FriendRequest;
+
+// Define the stack for friend requests
+typedef struct Stack {
+    FriendRequest* top;
+} Stack;
+
+// Function to create a new user account
+User * createUser (const char* username, const char* password) {
+    User* newUser  = (User *)malloc(sizeof(User));
+    if (!newUser ) {
+        printf("Memory allocation failed\n");
+        exit(1);
+    }
+    strncpy(newUser ->username, username, sizeof(newUser ->username) - 1);
+    newUser ->username[sizeof(newUser ->username) - 1] = '\0';
+    strncpy(newUser ->password, password, sizeof(newUser ->password) - 1);
+    newUser ->password[sizeof(newUser ->password) - 1] = '\0';
+    newUser ->next = NULL;
+    return newUser ;
+}
+
+// Function to add a user to the linked list of users
+void addUser (User** head, const char* username, const char* password) {
+    User* newUser  = createUser (username, password);
+    newUser ->next = *head;  // New user points to the current head
+    *head = newUser ;  // Update head to new user
+    printf("\nAccount created successfully!\n");
+}
+
+// Function to login
+int loginUser (User* head, const char* username, const char* password) {
+    User* current = head;
+    while (current) {
+        if (strcmp(current->username, username) == 0 && strcmp(current->password, password) == 0) {
+            return 1;  // Successful login
+        }
+        current = current->next;
+    }
+    return 0;  // Login failed
+}
+
+// Function to create a new post
+Post* createPost(const char* title, const char* content) {
+    Post* newPost = (Post*)malloc(sizeof(Post));
+    if (!newPost) {
+        printf("Memory allocation failed\n");
+        exit(1);
+    }
+    strncpy(newPost->title, title, sizeof(newPost->title) - 1);
+    newPost->title[sizeof(newPost->title) - 1] = '\0';
+    strncpy(newPost->content, content, sizeof(newPost->content) - 1);
+    newPost->content[sizeof(newPost->content) - 1] = '\0';
+    newPost->timestamp = time(NULL);
+    newPost->next = NULL;
+    newPost->prev = NULL;  // prev is initialized to NULL
+    return newPost;
+}
+
+// Function to add a post to the doubly linked list (at the front)
+void addPost(Post** head, const char* title, const char* content) {
+    Post* newPost = createPost(title, content);
+    newPost->next = *head;  // New post's next points to current head
+    if (*head) {
+        (*head)->prev = newPost;  // If list isn't empty, update head's prev
+    }
+    *head = newPost;  // Update head to new post
+    printf("Post added successfully!\n");
+}
+
+// Function to view all posts (both forward and backward)
+void viewPosts(Post* head) {
+    if (!head) {
+        printf("No posts available.\n");
+        return;
+    }
+
+    // View posts forwards
+    printf("Recent Posts:\n");
+    Post* current = head;
+    while (current) {
+        printf("Title: %s\n", current->title);
+        printf("Content: %s\n", current->content);
+        printf("Timestamp: %s\n", ctime(&current->timestamp));
+        printf("------------------------------------\n");
+        current = current->next;
+    }
+
+    // View posts backwards
+    printf("Last Posts:\n");
+    if (head) {
+        // Traverse to the last post
+        while (current) {
+            current = current->next;
+        }
+        // Traverse backward from the last post
+        while (current) {
+            printf("Title: %s\n", current->title);
+            printf("Content: %s\n", current->content);
+            printf("Timestamp: %s\n", ctime(&current->timestamp));
+            printf("------------------------------------\n");
+            current = current->prev;
+        }
+    }
+}
+
+// Function to edit a post
+void editPost(Post* head, const char* title) {
+    Post* current = head;
+    while (current) {
+        if (strcmp(current->title, title) == 0) {
+            printf("Current content: %s\n", current->content);
+            printf("Enter new content: ");
+            fgets(current->content, sizeof(current->content), stdin);
+            current->content[strcspn(current->content, "\n")] = '\0'; // Remove newline
+            printf("Post updated successfully!\n");
+            return;
+        }
+        current = current->next;
+    }
+    printf("Post with title '%s' not found.\n", title);
+}
+
+// Function to delete a post by title
+void deletePost(Post** head, const char* title) {
+    Post* current = *head;
+    while (current && strcmp(current->title, title) != 0) {
+        current = current->next;
+    }
+    if (!current) {
+        printf("Post with title '%s' not found.\n", title);
+        return;
+    }
+    if (current->prev) {
+        current->prev->next = current->next;  // Update prev node's next
+    } else {
+        *head = current->next;  // If it's the first post, update head
+    }
+    if (current->next) {
+        current->next->prev = current->prev;  // Update next node's prev
+    }
+    free(current);
+    printf("Post deleted successfully!\n");
+}
+
+// Function to create a new friend in BST
+Friend* createFriend(const char* name) {
+    Friend* newFriend = (Friend*)malloc(sizeof(Friend));
+    if (!newFriend) {
+        printf("Memory allocation failed\n");
+        exit(1);
+    }
+    strncpy(newFriend->name, name, sizeof(newFriend->name) - 1);
+    newFriend->name[sizeof(newFriend->name) - 1] = '\0';
+    newFriend->left = newFriend->right = NULL;
+    return newFriend;
+}
+
+// Function to insert a friend into the BST
+Friend* insertFriend(Friend* root, const char* name) {
+    if (!root) {
+        return createFriend(name);
+    }
+    if (strcmp(name, root->name) < 0) {
+        root->left = insertFriend(root->left, name);
+    } else if (strcmp(name, root->name) > 0) {
+        root->right = insertFriend(root->right, name);
+    }
+    return root;
+}
+
+// Function to search for a friend in BST
+Friend* searchFriend(Friend* root, const char* name) {
+    if (!root || strcmp(root->name, name) == 0) {
+        return root;
+    }
+    if (strcmp(name, root->name) < 0) {
+        return searchFriend(root->left, name);
+    }
+    return searchFriend(root->right, name);
+}
+
+// Function to delete a friend from BST
+Friend* deleteFriend(Friend* root, const char* name) {
+    if (!root) return NULL;
+    if (strcmp(name, root->name) < 0) {
+        root->left = deleteFriend(root->left, name);
+    } else if (strcmp(name, root->name) > 0) {
+        root->right = deleteFriend(root->right, name);
+    } else {
+        if (!root->left) {
+            Friend* temp = root->right;
+            free(root);
+            return temp;
+        } else if (!root->right) {
+            Friend* temp = root->left;
+            free(root);
+            return temp;
+        }
+        Friend* temp = root->right;
+        while (temp && temp->left) temp = temp->left;
+        strcpy(root->name, temp->name);
+        root->right = deleteFriend(root->right, temp->name);
+    }
+    return root;
+}
+
+// Function to display friends in in-order traversal
+void inorderTraversal(Friend* root) {
+    if (!root) return;
+    inorderTraversal(root->left);
+    printf("\nFriend: %s\n", root->name);
+    inorderTraversal(root->right);
+}
+
+// Function to create a friend request
+FriendRequest* createFriendRequest(const char* requester) {
+    FriendRequest* newRequest = (FriendRequest*)malloc(sizeof(FriendRequest));
+    if (!newRequest) {
+        printf("Memory allocation failed\n");
+        exit(1);
+    }
+    strncpy(newRequest->requester, requester, sizeof(newRequest->requester) - 1);
+    newRequest->requester[sizeof(newRequest->requester) - 1] = '\0';
+    newRequest->next = NULL;
+    return newRequest;
+}
+
+// Function to initialize the stack
+Stack* createStack() {
+    Stack* stack = (Stack*)malloc(sizeof(Stack));
+    stack->top = NULL;
+    return stack;
+}
+
+// Function to send a friend request
+void sendFriendRequest(Stack* stack, const char* requester) {
+    FriendRequest* newRequest = createFriendRequest(requester);
+    newRequest->next = stack->top;  // Add to the top of the stack
+    stack->top = newRequest;  // Update top to new request
+    printf("\nFriend request sent by %s\n", requester);
+}
+
+// Function to view all friend requests
+void viewFriendRequests(Stack* stack) {
+    if (!stack->top) {
+        printf("\nNo pending friend requests.\n");
+        return;
+    }
+    printf("\nPending Friend Requests:\n");
+    FriendRequest* current = stack->top;
+    int index = 1;
+    while (current) {
+        printf("\n%d. Request from: %s\n", index++, current->requester);
+        current = current->next;
+    }
+}
+
+// Function to accept a specific friend request
+void acceptFriendRequest(Stack* stack, Friend** friendsTree, int requestIndex) {
+    if (!stack->top) {
+        printf("\nNo pending friend requests.\n");
+        return;
+    }
+    FriendRequest* current = stack->top;
+    FriendRequest* prev = NULL;
+    int index = 1;
+
+    while (current && index < requestIndex) {
+        prev = current;
+        current = current->next;
+        index++;
+    }
+
+    if (!current) {
+        printf("Invalid request number.\n");
+        return;
+    }
+
+    *friendsTree = insertFriend(*friendsTree, current->requester);
+    printf("\nFriend request from %s accepted!\n", current->requester);
+
+    // Remove the accepted request from the stack
+    if (prev) {
+        prev->next = current->next;  // Bypass the accepted request
+    } else {
+        stack->top = current->next;  // Update top if it's the first request
+    }
+    free(current);
+}
+
+// Main function
+int main() {
+    Post* postHead = NULL;
+    Stack* friendRequestStack = createStack();
+    Friend* friendsTree = NULL;
+    User* userHead = NULL;  // Head of the user linked list
+    int choice;
+    char title[100], content[500], name[100], username[100], password[100];
+    int loggedIn = 0;  // Flag to check if a user is logged in
+
+    while (1) {
+        if (!loggedIn) {
+            printf("\n----- ^-^ ^-^ ^-^ ^-^ ^-^ -----------\n");
+            printf("\n$--  Facebook @ mini  --$\n");
+            printf("\n| 1. Create Account\n");
+            printf("| 2. Log In\n");
+            printf("| 3. Exit\n");
+            printf("| Enter your choice: ");
+            scanf("%d", &choice);
+            getchar(); // Clear newline from input buffer
+
+            switch (choice) {
+                case 1:
+                    printf("\nEnter username: ");
+                    fgets(username, sizeof(username), stdin);
+                    username[strcspn(username, "\n")] = '\0';
+                    printf("Enter password: ");
+                    fgets(password, sizeof(password), stdin);
+                    password[strcspn(password, "\n")] = '\0';
+                    addUser (&userHead, username, password);
+                    break;
+                case 2:
+                    printf("\nEnter username: ");
+                    fgets(username, sizeof(username), stdin);
+                    username[strcspn(username, "\n")] = '\0';
+                    printf("Enter password: ");
+                    fgets(password, sizeof(password), stdin);
+ password[strcspn(password, "\n")] = '\0';
+                    if (loginUser (userHead, username, password)) {
+                        loggedIn = 1;  // Set logged in flag
+                        printf("\nLogin successful!\n");
+                        printf("\nWelcome to Facebook@mini!\n");
+                    } else {
+                        printf("Invalid username or password.\n");
+                    }
+                    break;
+                case 3:
+                    printf("Exiting...\n");
+                    return 0;
+                default:
+                    printf("Invalid choice. Please try again.\n");
+            }
+        } else {
+            printf("\n----- ^-^ ^-^ ^-^ ^-^ ^-^ -----------\n");
+            printf("\n$--  Facebook @ mini  --$\n");
+            printf("\n| 1. Add Post\n");
+            printf("| 2. View Posts\n");
+            printf("| 3. Edit Post\n");
+            printf("| 4. Delete Post\n");
+            printf("| 5. Send Friend Request\n");
+            printf("| 6. View Friend Requests\n");
+            printf("| 7. Accept Friend Request\n");
+            printf("| 8. View Friends (In-order Traversal)\n");
+            printf("| 9. Delete Friend\n");
+            printf("| 10. Log Out\n");
+            printf("| 11. Exit\n");
+            printf("| Enter your choice: ");
+            scanf("%d", &choice);
+            getchar(); // Clear newline from input buffer
+
+            switch (choice) {
+                case 1:
+                    printf("\nEnter title: ");
+                    fgets(title, sizeof(title), stdin);
+                    title[strcspn(title, "\n")] = '\0';
+                    printf("Enter content: ");
+                    fgets(content, sizeof(content), stdin);
+                    content[strcspn(content, "\n")] = '\0';
+                    addPost(&postHead, title, content);
+                    break;
+                case 2:
+                    viewPosts(postHead);
+                    break;
+                case 3:
+                    printf("\nEnter title of the post to edit: ");
+                    fgets(title, sizeof(title), stdin);
+                    title[strcspn(title, "\n")] = '\0';
+                    editPost(postHead, title);
+                    break;
+                case 4:
+                    printf("\nEnter title of the post to delete: ");
+                    fgets(title, sizeof(title), stdin);
+                    title[strcspn(title, "\n")] = '\0';
+                    deletePost(&postHead, title);
+                    break;
+                case 5:
+                    printf("\nEnter name to send friend request: ");
+                    fgets(name, sizeof(name), stdin);
+                    name[strcspn(name, "\n")] = '\0';
+                    sendFriendRequest(friendRequestStack, name);
+                    break;
+                case 6:
+                    viewFriendRequests(friendRequestStack);
+                    break;
+                case 7: {
+                    int requestIndex;
+                    printf("\nEnter the request number to accept: ");
+                    scanf("%d", &requestIndex);
+                    acceptFriendRequest(friendRequestStack, &friendsTree, requestIndex);
+                    break;
+                }
+                case 8:
+                    inorderTraversal(friendsTree);
+                    break;
+                case 9:
+                    printf("\nEnter name to delete friend: ");
+                    fgets(name, sizeof(name), stdin);
+                    name[strcspn(name, "\n")] = '\0';
+                    friendsTree = deleteFriend(friendsTree, name);
+                    break;
+                case 10:
+                    loggedIn = 0;  // Log out the user
+                    printf("Logged out successfully.\n");
+                    break;
+                case 11:
+                    printf("Exiting...\n");
+                    return 0;
+                default:
+                    printf("Invalid choice. Please try again.\n");
+            }
+        }
+    }
+    return 0;
+}
